@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_ACTIVE_ALARMS" Id="{ac0d078d-dcf3-43d3-87ee-26d14d7f36c9}">
+    <Declaration><![CDATA[TYPE ST_ACTIVE_ALARMS :
+STRUCT
+	byAckStatus	: BYTE;			//Status do alarme
+	byGroup		: BYTE;			//Grupo do alarme
+	sDate		: STRING(10);	//Hora de entrada do alarme
+	sHour		: STRING(10);	//Hora de saida do alarme
+	iNumber		: INT;			//Numero do alarme
+	dwTextColor	: DWORD;		//Cor do alarme
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

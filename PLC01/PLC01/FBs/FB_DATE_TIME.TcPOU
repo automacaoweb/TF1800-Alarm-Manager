@@ -1,0 +1,111 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="FB_DATE_TIME" Id="{ba529150-14e8-4c18-9324-bb755d200ee3}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_DATE_TIME
+VAR_INPUT
+	bClock : BOOL ;
+END_VAR
+VAR_OUTPUT
+	sDate		: STRING;
+	sTime		: STRING;
+END_VAR
+VAR
+	(* Variaveis para controle de data e hora *)
+	Timer1s : TON ; 						//Gerador de pulso de 1s
+	fbNtGetTime: NT_GetTime;					//Obtem hora do Windows
+	stData_Hora: TIMESTRUCT;			//Estrutura com data e hora
+
+	iAux_Dia	: INT;
+	sAux_Dia	: STRING;
+	
+	iAux_Mes	: INT;
+	sAux_Mes	: STRING;
+	
+	sDia_Mes	: STRING;
+	sDia_Mes_Aux: STRING;
+	
+	iAux_Hora	: INT;
+	sAux_Hora	: STRING;
+	
+	iAux_Min	: INT;
+	sAux_Min	: STRING;
+	
+	iAux_Seg	: INT;
+	sAux_Seg	: STRING;
+	
+	sHora_Aux	: STRING;
+	sHora		: STRING;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(********** LEITURA DA DATA E HORA DO PLC ***********)	
+(********** READ DATE AND TIME FROM PLC **********)
+(* Leitura do relógio da CP / Read Clock from PLC *)	
+fbNtGetTime(
+	NETID:= '',
+	START:=  bClock,
+	TMOUT:= ,
+	BUSY=> ,
+	ERR=> ,
+	ERRID=> ,
+	TIMESTR=>stData_Hora );
+
+(* DIA DO TIMESTRUCT / DAY FROM TIMESTRUCT *)	
+iAux_Dia:= WORD_TO_INT(stData_Hora.wDay);
+IF (iAux_Dia) < 10 THEN
+	sAux_Dia:= CONCAT('0', INT_TO_STRING(iAux_Dia));
+	sAux_Dia:= CONCAT(sAux_Dia, '/');
+ELSE
+	sAux_Dia:=CONCAT(INT_TO_STRING(iAux_Dia),'/');
+END_IF
+
+(* Extrai o mes do TIMESTRUCT *)	
+iAux_Mes:= WORD_TO_INT(stData_Hora.wMonth);
+IF (iAux_Mes) < 10 THEN
+	sAux_Mes:= CONCAT('0', INT_TO_STRING(iAux_Mes));
+ELSE
+	sAux_Mes:=INT_TO_STRING(iAux_Mes);
+END_IF
+
+(* Concatena dia, mês e ano *)
+sDia_Mes_Aux := CONCAT(sAux_Dia,sAux_Mes);
+sDia_Mes:= CONCAT(sDia_Mes_Aux,'/');
+sDate	:= CONCAT(sDia_Mes,WORD_TO_STRING(stData_Hora.wYear));
+
+(* Extrai o hora  do TIMESTRUCT *)	
+iAux_Hora:= WORD_TO_INT(stData_Hora.wHour);
+IF  (iAux_Hora) < 10 THEN
+	sAux_Hora:= CONCAT('0', INT_TO_STRING(iAux_Hora));
+	sAux_Hora:= CONCAT(sAux_Hora, ':');
+ELSE
+	sAux_Hora:=CONCAT(INT_TO_STRING(iAux_Hora),':');
+END_IF
+
+(* Extrai o minuto  do TIMESTRUCT *)	
+iAux_Min:= WORD_TO_INT(stData_Hora.wMinute);
+IF (iAux_Min) < 10 THEN
+	sAux_Min:= CONCAT('0', INT_TO_STRING(iAux_Min));
+ELSE
+	sAux_Min:=INT_TO_STRING(iAux_Min);
+END_IF
+
+(* Extrai o segundo do TIMESTRUCT *)	
+iAux_Seg:= WORD_TO_INT(stData_Hora.wSecond);
+IF (iAux_Seg) < 10 THEN
+	sAux_Seg:= CONCAT('0', INT_TO_STRING(iAux_Seg));
+ELSE
+	sAux_Seg:=INT_TO_STRING(iAux_Seg);
+END_IF
+
+(* Concatena hora, minuto e segundo *)
+sHora_Aux	:= CONCAT(sAux_Hora,sAux_Min);
+sHora	:= CONCAT(sHora_Aux,':');
+sTime	:= CONCAT(sHora,sAux_Seg);	]]></ST>
+    </Implementation>
+    <LineIds Name="FB_DATE_TIME">
+      <LineId Id="10" Count="1" />
+      <LineId Id="16" Count="59" />
+      <LineId Id="9" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

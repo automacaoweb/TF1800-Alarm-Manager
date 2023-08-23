@@ -1,0 +1,233 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="FB_ALARM_MANAGER" Id="{5a95a2b0-85cd-45f6-a5a9-11ac50f78f14}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_ALARM_MANAGER
+VAR_INPUT
+	Alarms	: ARRAY [0..iNumberOfEvents] OF BOOL;	//
+	bResetAlarms	:	BOOL	;	//
+	bResetEvents	:	BOOL	;	//
+	sData	:	STRING	;	//Data no formato STRING. Saida do bloco FB_DataHora.
+	sHora	:	STRING	;	//Hora no formato STRING Saida do bloco FB_DataHora.
+END_VAR
+VAR_OUTPUT
+	Alarmes_Online : ARRAY[0..iNumberOfEvents] OF ST_ACTIVE_ALARMS;
+	Alarmes_Historico : ARRAY[0..iNumberOfHistory] OF ST_ALARMS_HISTORY;
+	bActiveAlarm : BOOL ;
+	bActiveWarning : BOOL ;
+END_VAR
+VAR
+	Alarmes : ARRAY [0..iNumberOfEvents] OF ST_ALARMS;
+	i: INT := 0;
+	iArray: INT;
+	iAlarmesAtivos: INT := 0;
+	iVerificaAlarmes: INT := 0;
+	iLinha: INT := 0;
+	iAux: INT;
+	bAlarmeExistente: BOOL;
+	byAlertas: BYTE;
+	byAlarmes: BYTE;
+	byACK: BYTE;
+
+(* Variaveis para cores das mensagens *)	
+	dwColorNull: DWORD;
+	dwColorAlerta: DWORD;
+	dwColorAlarme: DWORD;
+	dwColorAlarmeOff: DWORD;
+	dwColorAck: DWORD;
+
+(* Bit para logica no primeiro scan *)	
+	FirstScan: BOOL;
+	teste: INT;
+END_VAR
+
+VAR_IN_OUT
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[(* Definição dos bytes de cada Grupo de Eventos *)
+byAlertas 	:= 1; (* Grupo ALERTAS *)
+byAlarmes 	:= 2; (* Grupo ALARMES *)
+byACK		:= 5; (* Alarme Reconhecido *)
+
+(* Definição das cores em cada condição *)
+dwColorNull		:= 16#FF000000; (* Cor Preta *)
+dwColorAlerta 	:= 16#FFFFFF00; (* Cor Amarela *)
+dwColorAlarme 	:= 16#FFFF0000; (* Cor Vermelha *)
+dwColorAlarmeOff:= 16#FF0000FF; (* Cor Azul *)
+dwColorAck 		:= 16#FF00FF00; (* Cor Verde *)
+
+FOR i:= 1 TO iNumberOfEvents DO
+	Alarmes[i].bActive := Alarms[i];
+	IF i <= iNumberOfWarning THEN
+		Alarmes[i].byGroup := byAlertas;
+		Alarmes[i].dwTextColor := dwColorAlerta;
+	ELSIF (i > iNumberOfWarning) AND (i <= iNumberOfEvents) THEN
+		Alarmes[i].byGroup := byAlarmes;	
+		Alarmes[i].dwTextColor := dwColorAlarme;
+	END_IF
+END_FOR
+
+(* Primeiro SCAN, verifica se tem algum alarme no histórico que ficou sem informação ao desligar a máquina *)
+IF NOT FirstScan THEN
+	FOR iLinha:= 0 TO 1000 BY 1 DO
+		IF Alarmes_Historico[iLinha].iNumber <> 0 THEN
+			IF Alarmes_Historico[iLinha].sDate_off = '' THEN
+				Alarmes_Historico[iLinha].sDate_off		:= 'Power OFF';
+				Alarmes_Historico[iLinha].sHour_off		:= 'Power OFF';
+			END_IF
+		END_IF
+	END_FOR
+	FirstScan := TRUE;
+END_IF
+
+IF TRUE THEN
+	WHILE iArray < iNumberOfEvents DO
+		(*Verifica se o Alarme esta Ativo , caso positivo popula o array de alarmes Online ( que sera mostrado no Grid )*)
+		IF Alarmes[iArray].bActive THEN
+			iAux := 0;
+			WHILE iAux < iNumberOfEvents AND NOT bAlarmeExistente DO
+				IF Alarmes_Online[iAux].iNumber = iArray THEN
+					bAlarmeExistente := TRUE;
+					bActiveAlarm := TRUE ;
+					(* Verifica se o alarme voltou a ativar sem ser reconhecido e troca a cor *)
+					IF Alarmes_Online[iAux].dwTextColor = dwColorAlarmeOff THEN 
+						Alarmes_Online[iAux].dwTextColor := Alarmes[iArray].dwTextColor;
+						Alarmes_Online[iAux].byGroup := byAlarmes;
+						
+						// Se o Alarme ativou novamente, Armazena novamente no histórico
+						FOR iLinha:= 1000 TO 1 BY -1 DO
+							ALARMES_HISTORICO[iLinha] := ALARMES_HISTORICO[iLinha-1];
+						END_FOR
+						Alarmes_Historico[0].dwTextColor	:= Alarmes[iArray].dwTextColor;
+						Alarmes_Historico[0].sDate_on		:= sData;
+						Alarmes_Historico[0].sHour_on		:= sHora;
+						Alarmes_Historico[0].sDate_off		:= '';
+						Alarmes_Historico[0].sHour_off		:= '';
+						Alarmes_Historico[0].iNumber		:= iArray;
+						Alarmes_Historico[0].byGroup		:= Alarmes[iArray].byGroup;
+
+					END_IF
+				END_IF
+				iAux := iAux + 1;
+			END_WHILE
+
+			IF NOT bAlarmeExistente THEN
+				// Apresentação de um novo alarme
+				FOR iLinha:= iAlarmesAtivos TO 1 BY -1 DO
+					Alarmes_Online[iLinha] := Alarmes_Online[iLinha-1];
+				END_FOR
+				Alarmes_Online[0].dwTextColor	:= Alarmes[iArray].dwTextColor;
+				Alarmes_Online[0].sDate			:= sData ;
+				Alarmes_Online[0].sHour			:= sHora ;
+				Alarmes_Online[0].iNumber		:= iArray ;
+				Alarmes_Online[0].byAckStatus	:= 0;
+				Alarmes_Online[0].byGroup		:= Alarmes[iArray].byGroup;
+				
+				// Incrementa contagem de alarmes ativos
+				iAlarmesAtivos := iAlarmesAtivos+1;
+
+				// Armazena todos os alarmes em histórico
+				FOR iLinha:= 1000 TO 1 BY -1 DO
+					Alarmes_Historico[iLinha] := Alarmes_Historico[iLinha-1];
+				END_FOR
+				Alarmes_Historico[0].dwTextColor	:= Alarmes[iArray].dwTextColor;
+				Alarmes_Historico[0].sDate_on		:= sData ;
+				Alarmes_Historico[0].sHour_on		:= sHora ;
+				Alarmes_Historico[0].sDate_off		:= '';
+				Alarmes_Historico[0].sHour_off		:= '';
+				Alarmes_Historico[0].iNumber		:= iArray;
+				Alarmes_Historico[0].byGroup		:= Alarmes[iArray].byGroup;
+			END_IF
+
+		END_IF
+
+		iArray := iArray+1;
+		bAlarmeExistente := FALSE;
+		bActiveAlarm := FALSE ;
+
+	END_WHILE
+
+
+	WHILE iVerificaAlarmes < iAlarmesAtivos AND iAlarmesAtivos > 0 DO
+
+		IF bResetAlarms THEN
+			Alarmes_Online[iVerificaAlarmes].byAckStatus := byACK; (* Alarme foi Reconhecido mas continua ativo *)
+			Alarmes_Online[iVerificaAlarmes].dwTextColor := dwColorAck; (* COR Alarme foi Reconhecido mas continua ativo *)
+		END_IF
+		
+		(*Verifica se o Alarme ainda esta Ativo , caso negativo retira do array de alarmes Online ( que sera mostrado no Grid )*)
+		IF NOT Alarmes[ Alarmes_Online[iVerificaAlarmes].iNumber ].bActive THEN
+			Alarmes_Online[iVerificaAlarmes].dwTextColor := dwColorAlarmeOff; (* COR Alarme Não está mais ativo *)
+	
+			(* Se o Alarme não está mais ativo, informa o horário que o alarme foi desligado no histórico *)
+			FOR iLinha:= 0 TO 1000 BY 1 DO
+				IF Alarmes_Historico[iLinha].iNumber = Alarmes_Online[iVerificaAlarmes].iNumber THEN
+					IF Alarmes_Historico[iLinha].sDate_off = '' THEN
+						Alarmes_Historico[iLinha].sDate_off		:= sData ;
+						Alarmes_Historico[iLinha].sHour_off		:= sHora ;
+					END_IF
+					EXIT;
+				END_IF
+			END_FOR
+			
+			IF Alarmes_Online[iVerificaAlarmes].byAckStatus = byACK THEN
+			
+				FOR iLinha:= iVerificaAlarmes TO (iNumberOfEvents-1) BY 1 DO
+					Alarmes_Online[iLinha] := Alarmes_Online[iLinha+1];
+				END_FOR
+
+				Alarmes_Online[iNumberOfEvents].sDate		:= '';
+				Alarmes_Online[iNumberOfEvents].sHour		:= '';
+				Alarmes_Online[iNumberOfEvents].dwTextColor	:= dwColorNull;
+				Alarmes_Online[iNumberOfEvents].iNumber		:= 0;
+				Alarmes_Online[iNumberOfEvents].byAckStatus	:= 0;
+				Alarmes_Online[iNumberOfEvents].byGroup		:= 0;
+				iAlarmesAtivos := iAlarmesAtivos -1 ;
+			
+			END_IF
+		
+		END_IF
+
+		iVerificaAlarmes := iVerificaAlarmes + 1 ;
+
+	END_WHILE
+
+	IF iArray >= iNumberOfEvents THEN
+		iArray				:=0;(*Index Utilizado para navegar o Array de Alarmes para verificar se os alarmes estao OnLine*)
+		iVerificaAlarmes	:=0;
+		iLinha				:=0;
+	END_IF
+
+END_IF
+
+//RESET EVENTS / RESETA EVENTOS
+IF bResetEvents THEN (* Reset de eventos *)
+	FOR iLinha:= 0 TO iNumberOfHistory BY 1 DO
+		Alarmes_Historico[iLinha].byGroup		:= 0 ;	
+		Alarmes_Historico[iLinha].sDate_on		:= ' ' ;
+		Alarmes_Historico[iLinha].sHour_on		:= ' ' ;
+		Alarmes_Historico[iLinha].sDate_off		:= ' ' ;
+		Alarmes_Historico[iLinha].sHour_off		:= ' ' ;
+		Alarmes_Historico[iLinha].iNumber		:= 0 ;		
+		Alarmes_Historico[iLinha].dwTextColor	:= 16#FF000000 ;
+	END_FOR
+END_IF
+
+//CHECK ACTIVE ALARM / VERIFICA SE EXISTE ALARME ATIVO
+FOR i := 0 TO iNumberOfEvents DO
+	// Alarme precisa estar ativo no grupo 2 de alarme e Não reconhecido
+	IF (Alarmes_Online[i].byGroup = 2) AND (Alarmes_Online[i].byAckStatus <> 5) THEN
+		bActiveAlarm := TRUE;
+		EXIT;
+	ELSE
+		bActiveAlarm := FALSE;
+	END_IF
+	
+	IF (Alarmes_Online[i].byGroup = 1) AND (Alarmes_Online[i].byAckStatus <> 5) THEN
+		bActiveWarning := TRUE ;
+	ELSE
+		bActiveWarning := FALSE ;
+	END_IF		
+END_FOR]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>

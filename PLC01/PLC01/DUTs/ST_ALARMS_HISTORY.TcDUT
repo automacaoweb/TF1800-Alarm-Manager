@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <DUT Name="ST_ALARMS_HISTORY" Id="{2c467db7-29e1-4593-90cb-1030c828cbe8}">
+    <Declaration><![CDATA[TYPE ST_ALARMS_HISTORY:
+STRUCT
+	byGroup		: BYTE ;		//Byte do grupo
+	sDate_on	: STRING(10) ;	//Data de entrada do evento
+	sHour_on	: STRING(10) ;	//Hora de entrada do evento
+	sDate_off	: STRING(10) ;	//Data de saida do evento
+	sHour_off	: STRING(10) ;	//Hora de saida do evento
+	iNumber		: INT ;			//Numero da mensagem de alarme
+	dwTextColor	: DWORD ;		//Cor do evento
+END_STRUCT
+END_TYPE]]></Declaration>
+  </DUT>
+</TcPlcObject>

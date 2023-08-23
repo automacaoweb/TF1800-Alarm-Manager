@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <GVL Name="GVL_ALARMS" Id="{aa14acb5-dde6-4f54-8b06-a75f6081b94e}">
+    <Declaration><![CDATA[VAR_GLOBAL CONSTANT
+(* Variaveis constantes do gerenciador de alarmes *)
+	
+	iNumberOfWarning: INT := 100 ;	//Quantidade de mensagens de alertas 
+	iNumberOfAlarms	: INT := 200 ;	//Quantidade de mensagens de alarmes
+	iNumberOfEvents	: INT := 300 ;	// = iNumberOfWarning + iNumberOfAlarms;//Total de eventos = alarmes + alertas
+	iNumberOfHistory: INT := 1000 ;	//Total de mensagens no historico
+END_VAR
+
+VAR_GLOBAL
+(* Variaveis para reset de mensagens e array para ativação dos alertas e alarmes *)	
+	bResetAlarms		: BOOL ; 										//Reset de Alarmes
+	bResetEvents		: BOOL ; 	
+	bActiveAlarm		: BOOL ;	//EXISTE ALARME NO SISTEMA / THERE ARE ALARM									//Reset de Eventos
+	bActiveWarning		: BOOL ;
+	aAlarms				: ARRAY [0..iNumberOfEvents] OF BOOL;				//Cada posição do array ativa uma mensagem de alarme 
+END_VAR
+	
+VAR_GLOBAL PERSISTENT
+(* Variaveis do tipo array vinculadas as tabelas de alarme e historico *)	
+	ACTIVE_ALARMS	: ARRAY [0..iNumberOfEvents]  OF ST_ACTIVE_ALARMS;		//Array para link com a tabela de alarmes
+	HISTORY_ALARMS	: ARRAY [0..iNumberOfHistory] OF ST_ALARMS_HISTORY;		//Array para link com a tabela de eventos
+END_VAR
+]]></Declaration>
+  </GVL>
+</TcPlcObject>
